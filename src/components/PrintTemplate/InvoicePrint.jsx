@@ -51,13 +51,13 @@ export default function InvoicePrint({ bill, profile }) {
       {/* ══ HEADER ══════════════════════════════════════════════ */}
       <div style={{ textAlign: 'center', marginBottom: 4 }}>
         <div style={{ fontSize: 20, fontWeight: 900, color: '#cc0066', letterSpacing: 1, marginBottom: 3 }}>
-          {profile.business_name?.toUpperCase()}
+          {profile?.business_name?.toUpperCase() || 'SHRUTI LAMINATE'}
         </div>
         <div style={{ fontSize: 10, lineHeight: 1.7 }}>
-          {profile.address}
+          {profile?.address || 'KANJI MANJI ESTATE,GALA NO,B-03,KALA MAIDAN,N S S ROAD, GHATKOPAR WEST'}
         </div>
         <div style={{ fontSize: 10 }}>
-          {profile.phone && profile.phone}{profile.email && `,EMAIL-${profile.email}`}
+          {profile?.phone || '022-25103747 / 02225103748'}{profile?.email ? `,EMAIL-${profile.email}` : ',EMAIL-shrutilaminate19@gmail.com'}
         </div>
       </div>
 
@@ -124,6 +124,7 @@ export default function InvoicePrint({ bill, profile }) {
             <th style={{ ...cell({ textAlign: 'center', fontWeight: 700, width: 72, whiteSpace: 'nowrap' }) }}>HSN/SAC</th>
             <th style={{ ...cell({ textAlign: 'right', fontWeight: 700, width: 64, whiteSpace: 'nowrap' }) }}>Qty</th>
             <th style={{ ...cell({ textAlign: 'right', fontWeight: 700, width: 70, whiteSpace: 'nowrap' }) }}>Rate</th>
+            <th style={{ ...cell({ textAlign: 'center', fontWeight: 700, width: 44, whiteSpace: 'nowrap' }) }}>Disc%</th>
             <th style={{ ...cell({ textAlign: 'center', fontWeight: 700, width: 52, whiteSpace: 'nowrap' }) }}>GST %</th>
             <th style={{ ...cell({ textAlign: 'right', fontWeight: 700, width: 80, whiteSpace: 'nowrap' }) }}>Amount</th>
           </tr>
@@ -139,10 +140,11 @@ export default function InvoicePrint({ bill, profile }) {
                 {new Intl.NumberFormat('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(item.quantity)}
               </td>
               <td style={{ ...cell({ textAlign: 'right' }) }}>{f2(item.rate)}</td>
+              <td style={{ ...cell({ textAlign: 'center' }) }}>{Number(item.discount_pct || 0)}</td>
               <td style={{ ...cell({ textAlign: 'center' }) }}>{Number(item.gst_rate).toFixed(2)}</td>
               <td style={{ ...cell({ textAlign: 'right', fontWeight: 600 }) }}>
-                {/* Amount shown without GST (taxable) then grand with GST */}
-                {f2(item.quantity * item.rate)}
+                {/* Amount shown without GST (taxable) after discount */}
+                {f2(item.quantity * item.rate * (1 - (item.discount_pct||0)/100))}
               </td>
             </tr>
           ))}
@@ -151,6 +153,7 @@ export default function InvoicePrint({ bill, profile }) {
           {Array.from({ length: emptyRows }).map((_, i) => (
             <tr key={`e${i}`}>
               <td style={{ ...cell({ height: 22 }) }}></td>
+              <td style={{ ...cell() }}></td>
               <td style={{ ...cell() }}></td>
               <td style={{ ...cell() }}></td>
               <td style={{ ...cell() }}></td>
@@ -171,26 +174,24 @@ export default function InvoicePrint({ bill, profile }) {
 
               {/* GSTIN */}
               <div style={{ fontWeight: 900, fontSize: 11, marginBottom: 4 }}>
-                GSTIN No.: {profile.gstin}
+                GSTIN No.: {profile?.gstin || '27CXSPS8629A1ZV'}
               </div>
 
               {/* Bank */}
-              {profile.bank_name && (
-                <table style={{ borderCollapse: 'collapse', fontSize: 10, marginBottom: 4 }}>
-                  <tbody>
-                    {[
-                      ['Bank Name', profile.bank_name],
-                      ['Bank A/c. No.', profile.bank_account],
-                      ['RTGS/IFSC Code', profile.ifsc_code],
-                    ].map(([k, v]) => (
-                      <tr key={k}>
-                        <td style={{ fontWeight: 700, paddingRight: 4, whiteSpace: 'nowrap' }}>{k}</td>
-                        <td>: &nbsp;{v}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+              <table style={{ borderCollapse: 'collapse', fontSize: 10, marginBottom: 4 }}>
+                <tbody>
+                  {[
+                    ['Bank Name', profile?.bank_name || 'H D F C BANK'],
+                    ['Bank A/c. No.', profile?.bank_account || '50200032654443'],
+                    ['RTGS/IFSC Code', profile?.ifsc_code || 'HDFC0000836'],
+                  ].map(([k, v]) => (
+                    <tr key={k}>
+                      <td style={{ fontWeight: 700, paddingRight: 4, whiteSpace: 'nowrap' }}>{k}</td>
+                      <td>: &nbsp;{v}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
 
               {/* Amount in words */}
               <div style={{ borderTop: '1px solid #ddd', paddingTop: 4, marginTop: 2 }}>
@@ -278,7 +279,7 @@ export default function InvoicePrint({ bill, profile }) {
 
               {/* Signatory */}
               <div style={{ marginTop: 40, textAlign: 'right', fontSize: 11 }}>
-                <div>For, {profile.business_name}</div>
+                <div>For, {profile?.business_name || 'SHRUTI LAMINATE'}</div>
                 <div style={{ marginTop: 32, borderTop: '1px solid #000', paddingTop: 4, textAlign: 'center', fontSize: 10 }}>
                   (Authorised Signatory)
                 </div>

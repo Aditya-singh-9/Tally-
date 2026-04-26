@@ -3,17 +3,31 @@ import { useApp } from '../context/AppContext'
 import { Save, Building2 } from 'lucide-react'
 
 export default function Settings() {
-  const { profile, setProfile } = useApp()
-  const [form, setForm] = useState({ ...profile })
+  const { profile, updateProfile } = useApp()
+  const [form, setForm] = useState({ 
+    business_name: profile?.business_name || 'SHRUTI LAMINATE',
+    address: profile?.address || 'KANJI MANJI ESTATE,GALA NO,B-03,KALA MAIDAN,N S S ROAD, GHATKOPAR WEST',
+    phone: profile?.phone || '022-25103747 / 02225103748',
+    email: profile?.email || 'shrutilaminate19@gmail.com',
+    gstin: profile?.gstin || '27CXSPS8629A1ZV',
+    bank_name: profile?.bank_name || 'H D F C BANK',
+    bank_account: profile?.bank_account || '50200032654443',
+    ifsc_code: profile?.ifsc_code || 'HDFC0000836',
+    ...profile 
+  })
   const [saved, setSaved] = useState(false)
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  function handleSave(e) {
+  async function handleSave(e) {
     e.preventDefault()
-    setProfile(form)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+    try {
+      await updateProfile(form)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch(err) {
+      alert("Failed to save settings: " + err.message)
+    }
   }
 
   return (

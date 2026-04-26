@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { useApp } from '../context/AppContext'
+import { supabase } from '../lib/supabase'
 import { Eye, EyeOff, Zap } from 'lucide-react'
 
 export default function Login() {
-  const { login } = useApp()
   const [isSignup, setIsSignup] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -17,9 +16,36 @@ export default function Login() {
     setError('')
     if (!email || !password) { setError('Please fill in all fields.'); return }
     if (isSignup && !business) { setError('Please enter your business name.'); return }
+    
     setLoading(true)
-    await new Promise(r => setTimeout(r, 600)) // Simulate network
-    login(email, password)
+    
+    if (isSignup) {
+      const { data, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            business_name: business
+          }
+        }
+      })
+      
+      if (authError) {
+        setError(authError.message)
+      } else if (!data.session) {
+        // If email confirmation is turned on in Supabase
+        setError('Account created! Please check your email to confirm verify your account.')
+      }
+    } else {
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+      if (authError) {
+        setError(authError.message)
+      }
+    }
+    
     setLoading(false)
   }
 
@@ -120,20 +146,6 @@ export default function Login() {
             ) : isSignup ? 'Create Account' : 'Sign In'}
           </button>
         </form>
-
-        {/* Demo notice */}
-        <div style={{
-          marginTop: 20,
-          padding: '10px 14px',
-          background: 'rgba(99,102,241,0.08)',
-          border: '1px solid rgba(99,102,241,0.15)',
-          borderRadius: 'var(--radius-md)',
-          fontSize: 12,
-          color: 'var(--text-secondary)',
-          textAlign: 'center',
-        }}>
-          🔐 Demo mode — enter any email & password to continue
-        </div>
 
         <div style={{ marginTop: 16, textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)' }}>
           {isSignup ? 'Already have an account?' : "Don't have an account?"}{' '}

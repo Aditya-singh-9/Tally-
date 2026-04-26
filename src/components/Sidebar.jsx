@@ -1,19 +1,21 @@
 import { useApp } from '../context/AppContext'
 import {
   LayoutDashboard, Package, FileText, History,
-  BarChart2, Settings, LogOut, AlertTriangle
+  BarChart2, Settings, LogOut, AlertTriangle, Users, Truck
 } from 'lucide-react'
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard',    icon: LayoutDashboard },
   { id: 'inventory', label: 'Inventory',    icon: Package },
-  { id: 'billing',   label: 'New Bill',     icon: FileText },
+  { id: 'billing',   label: 'Sales Bill',   icon: FileText },
+  { id: 'purchases', label: 'Purchases',    icon: Truck },
+  { id: 'parties',   label: 'Parties',      icon: Users },
   { id: 'history',   label: 'Bill History', icon: History },
   { id: 'reports',   label: 'Reports',      icon: BarChart2 },
 ]
 
 export default function Sidebar({ currentPage, onNavigate }) {
-  const { profile, products, logout } = useApp()
+  const { user, profile, products, logout } = useApp()
 
   const lowStockCount = products.filter(p => p.quantity <= p.low_stock_threshold).length
 
@@ -81,11 +83,11 @@ export default function Sidebar({ currentPage, onNavigate }) {
       <div className="sidebar-footer">
         <div className="user-pill">
           <div className="user-avatar">
-            {profile.business_name.charAt(0)}
+            {(profile?.business_name || user?.user_metadata?.business_name || '?').charAt(0)}
           </div>
           <div className="user-info">
-            <div className="user-name">{profile.business_name}</div>
-            <div className="user-email">{profile.email}</div>
+            <div className="user-name">{profile?.business_name || user?.user_metadata?.business_name || 'My Business'}</div>
+            <div className="user-email">{profile?.email || user?.email || 'admin@business.com'}</div>
           </div>
           <button
             className="btn btn-ghost btn-icon"

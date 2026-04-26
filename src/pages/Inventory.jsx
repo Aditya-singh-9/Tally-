@@ -148,14 +148,16 @@ export default function Inventory() {
   const lowStock = products.filter(p => p.quantity <= p.low_stock_threshold).length
   const outOfStock = products.filter(p => p.quantity === 0).length
 
-  function handleSave(data) {
-    if (editProduct) {
-      updateProduct(editProduct.id, data)
-      setEditProduct(null)
-    } else {
-      addProduct(data)
-      setShowAdd(false)
-    }
+  async function handleSave(data) {
+    try {
+      if (editProduct) {
+        await updateProduct(editProduct.id, data)
+        setEditProduct(null)
+      } else {
+        await addProduct(data)
+        setShowAdd(false)
+      }
+    } catch(e) { alert(e.message) }
   }
 
   return (
@@ -276,7 +278,12 @@ export default function Inventory() {
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setDeleteId(null)}>Cancel</button>
-              <button id="confirm-delete" className="btn btn-danger" onClick={() => { deleteProduct(deleteId); setDeleteId(null) }}>
+              <button id="confirm-delete" className="btn btn-danger" onClick={async () => { 
+                try {
+                  await deleteProduct(deleteId); 
+                  setDeleteId(null);
+                } catch(e) { alert(e.message) }
+              }}>
                 Delete Product
               </button>
             </div>

@@ -32,7 +32,7 @@ export default function ChallanPrint({ bill, profile }) {
             fontFamily: 'Georgia, serif', border: '2px solid #00008B',
             padding: '4px 12px', lineHeight: 1,
           }}>
-            {profile.business_name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+            {(profile?.business_name || 'Business').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
           </div>
           <div style={{ textAlign: 'right', fontSize: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 8 }}>
@@ -84,7 +84,7 @@ export default function ChallanPrint({ bill, profile }) {
               <td style={{ border: '1px solid #00008B', padding: '4px 8px', fontSize: 11 }}>
                 {item.product_name}
                 {item.quantity && item.rate ? (
-                  <span style={{ color: '#666', fontSize: 10 }}> [{fmt(item.quantity, 0)} × ₹{fmt(item.rate)}]</span>
+                  <span style={{ color: '#666', fontSize: 10 }}> [{fmt(item.quantity, 0)} × ₹{fmt(item.rate)}{item.discount_pct ? ` - ${item.discount_pct}%` : ''}]</span>
                 ) : null}
               </td>
               <td style={{ border: '1px solid #00008B', padding: '4px 8px', textAlign: 'right', fontFamily: 'monospace' }}>
@@ -115,7 +115,7 @@ export default function ChallanPrint({ bill, profile }) {
 
       {/* Footer */}
       <div style={{ marginTop: 10, fontSize: 10, color: '#00008B', lineHeight: 1.6 }}>
-        <div style={{ fontWeight: 700 }}>GSTIN NO.: {profile.gstin}</div>
+        <div style={{ fontWeight: 700 }}>GSTIN NO.: {profile?.gstin || '27CXSPS8629A1ZV'}</div>
         <div>Goods once sold will not be taken back or Exchanged.</div>
         <div>No Guarantee for Bubble &amp; Crack.</div>
         <div>No Return | No Exchange</div>

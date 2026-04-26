@@ -9,13 +9,17 @@ import Billing from './pages/Billing'
 import BillHistory from './pages/BillHistory'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
+import Parties from './pages/Parties'
+import Purchases from './pages/Purchases'
 
 const PAGES = {
   dashboard: { component: Dashboard, title: 'Dashboard' },
   inventory:  { component: Inventory,  title: 'Inventory' },
-  billing:    { component: Billing,    title: 'New Bill' },
+  billing:    { component: Billing,    title: 'New Sales Bill' },
+  purchases:  { component: Purchases,  title: 'Purchase Voucher' },
+  parties:    { component: Parties,    title: 'Parties & Ledgers' },
   history:    { component: BillHistory, title: 'Bill History' },
-  reports:    { component: Reports,    title: 'Reports' },
+  reports:    { component: Reports,    title: 'Reports & GST' },
   settings:   { component: Settings,   title: 'Settings' },
 }
 

@@ -1,5 +1,5 @@
 import { useApp } from '../context/AppContext'
-import { getRevenue, getTopProducts, getSalesTrend } from '../lib/mockData'
+import { getRevenue, getTopProducts, getSalesTrend } from '../lib/analytics'
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer
@@ -30,7 +30,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 }
 
 export default function Dashboard({ onNavigate }) {
-  const { bills, products } = useApp()
+  const { bills, products, purchases } = useApp()
 
   const dailyRev = getRevenue(bills, 'daily')
   const monthlyRev = getRevenue(bills, 'monthly')
@@ -43,6 +43,7 @@ export default function Dashboard({ onNavigate }) {
   const pendingChallans = bills.filter(b => b.type === 'challan' && b.status === 'pending')
   const lowStockItems = products.filter(p => p.quantity <= p.low_stock_threshold)
   const recentBills = bills.slice(0, 5)
+  const recentPurchases = (purchases || []).slice(0, 5)
 
   const kpis = [
     { label: "Today's Revenue",   value: dailyRev,     color: 'accent', icon: IndianRupee },
@@ -143,8 +144,9 @@ export default function Dashboard({ onNavigate }) {
 
       {/* Bottom row */}
       <div className="grid gap-6" style={{ gridTemplateColumns: '1fr 320px' }}>
-        {/* Recent Bills */}
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {/* Recent Bills */}
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div className="card-title" style={{ margin: 0 }}>Recent Bills</div>
             <button className="btn btn-ghost btn-sm" onClick={() => onNavigate('history')}>View all</button>
@@ -181,6 +183,42 @@ export default function Dashboard({ onNavigate }) {
               ))}
             </tbody>
           </table>
+          </div>
+
+          {/* Recent Purchases */}
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div className="card-title" style={{ margin: 0 }}>Recent Purchases</div>
+              <button className="btn btn-ghost btn-sm" onClick={() => onNavigate('purchases')}>New Purchase</button>
+            </div>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>#</th><th>Supplier</th><th>Date</th><th className="num">Total</th><th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentPurchases.map(p => (
+                  <tr key={p.id}>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                      PUR-{String(p.bill_number).padStart(3, '0')}
+                    </td>
+                    <td style={{ fontWeight: 500 }}>{p.party_name}</td>
+                    <td style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                      {new Date(p.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                    </td>
+                    <td className="num">₹{fmt(p.grand_total)}</td>
+                    <td>
+                      <span className="badge badge-green">{p.status}</span>
+                    </td>
+                  </tr>
+                ))}
+                {recentPurchases.length === 0 && (
+                  <tr><td colSpan={5} style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)' }}>No purchases yet</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Alerts panel */}

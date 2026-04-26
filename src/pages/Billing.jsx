@@ -12,16 +12,17 @@ function emptyItem() {
     _key: Date.now() + Math.random(),
     product_id: '',
     product_name: '',
-    hsn_sac: '',       // auto-filled from product
-    gst_rate: 18,      // auto-filled from product
+    hsn_sac: '',       
+    gst_rate: 18,      
     quantity: '',
-    rate: '',          // user can override
+    rate: '',          
+    discount_pct: '',
     amount: 0,
   }
 }
 
 export default function Billing({ onNavigate }) {
-  const { products, customers, createBill, profile, bills } = useApp()
+  const { products, parties, addParty, createBill, profile, bills } = useApp()
 
   const [billType, setBillType] = useState('invoice')
   const [date, setDate] = useState(today())
@@ -38,7 +39,8 @@ export default function Billing({ onNavigate }) {
   const printRef = useRef()
 
   // ── Customer autocomplete ───────────────────────────────────
-  const custMatches = customers.filter(c =>
+  const custMatches = (parties || []).filter(c =>
+    c.type === 'customer' &&
     customerInput.length > 0 &&
     c.name.toLowerCase().includes(customerInput.toLowerCase())
   )
@@ -52,9 +54,11 @@ export default function Billing({ onNavigate }) {
   }
 
   // ── Line item helpers ───────────────────────────────────────
-  function calcAmount(rate, qty, gstRate) {
+  function calcAmount(rate, qty, discountPct, gstRate) {
     const base = parseFloat(rate || 0) * parseFloat(qty || 0)
-    return parseFloat((base + base * (gstRate / 100)).toFixed(2))
+    const discount = base * (parseFloat(discountPct || 0) / 100)
+    const taxable = base - discount
+    return parseFloat((taxable + taxable * (parseFloat(gstRate || 0) / 100)).toFixed(2))
   }
 
   function selectProduct(idx, prod) {
@@ -62,6 +66,7 @@ export default function Billing({ onNavigate }) {
       if (i !== idx) return it
       const rate = prod.price
       const qty = it.quantity || 1
+      const disc = it.discount_pct || 0
       return {
         ...it,
         product_id: prod.id,
@@ -70,7 +75,7 @@ export default function Billing({ onNavigate }) {
         gst_rate: prod.gst_rate,
         rate: rate,
         quantity: qty,
-        amount: calcAmount(rate, qty, prod.gst_rate),
+        amount: calcAmount(rate, qty, disc, prod.gst_rate),
       }
     }))
   }
@@ -79,7 +84,7 @@ export default function Billing({ onNavigate }) {
     setItems(prev => prev.map((it, i) => {
       if (i !== idx) return it
       const merged = { ...it, ...changes }
-      merged.amount = calcAmount(merged.rate, merged.quantity, merged.gst_rate)
+      merged.amount = calcAmount(merged.rate, merged.quantity, merged.discount_pct, merged.gst_rate)
       return merged
     }))
   }
@@ -92,12 +97,16 @@ export default function Billing({ onNavigate }) {
 
   // ── Totals ──────────────────────────────────────────────────
   const subtotal = items.reduce((s, it) => {
-    return s + parseFloat(it.rate || 0) * parseFloat(it.quantity || 0)
+    const base = parseFloat(it.rate || 0) * parseFloat(it.quantity || 0)
+    const discount = base * (parseFloat(it.discount_pct || 0) / 100)
+    return s + (base - discount)
   }, 0)
 
   const totalGst = items.reduce((s, it) => {
     const base = parseFloat(it.rate || 0) * parseFloat(it.quantity || 0)
-    return s + base * (parseFloat(it.gst_rate || 0) / 100)
+    const discount = base * (parseFloat(it.discount_pct || 0) / 100)
+    const taxable = base - discount
+    return s + taxable * (parseFloat(it.gst_rate || 0) / 100)
   }, 0)
 
   const grandTotal = parseFloat((subtotal + totalGst).toFixed(2))
@@ -137,39 +146,54 @@ export default function Billing({ onNavigate }) {
   }
 
   // ── Save ────────────────────────────────────────────────────
-  function handleSave() {
+  async function handleSave() {
     if (!validate()) return
 
-    const billData = {
-      type: billType,
-      status: billType === 'invoice' ? 'completed' : 'pending',
-      customer_id: customerId || 'c_new_' + Date.now(),
-      customer_name: customerInput,
-      customer_address: customerAddress,
-      customer_gstin: customerGstin,
-      place_of_supply: placeOfSupply,
-      date,
-      subtotal,
-      total_gst: totalGst,
-      grand_total: grandTotalRounded,
-      round_off: roundOff,
-      notes,
-      converted_from: null,
-      items: items.filter(it => it.product_name && it.quantity && it.rate).map(it => ({
-        id: 'bi_' + Date.now() + Math.random(),
-        product_id: it.product_id,
-        product_name: it.product_name,
-        hsn_sac: it.hsn_sac,
-        quantity: parseFloat(it.quantity),
-        rate: parseFloat(it.rate),
-        gst_rate: parseFloat(it.gst_rate),
-        amount: it.amount,
-      }))
-    }
+    try {
+      let finalPartyId = customerId
+      if (!finalPartyId && customerInput) {
+        const newParty = await addParty({
+          type: 'customer',
+          name: customerInput,
+          address: customerAddress,
+          gstin: customerGstin
+        })
+        finalPartyId = newParty.id
+      }
 
-    const bill = createBill(billData)
-    setSaved(bill)
-    setShowPrint(true)
+      const billData = {
+        type: billType,
+        status: billType === 'invoice' ? 'completed' : 'pending',
+        party_id: finalPartyId,
+        customer_name: customerInput,
+        customer_address: customerAddress,
+        customer_gstin: customerGstin,
+        place_of_supply: placeOfSupply,
+        date,
+        subtotal,
+        total_gst: totalGst,
+        grand_total: grandTotalRounded,
+        round_off: roundOff,
+        notes,
+        items: items.filter(it => it.product_name && it.quantity && it.rate).map(it => ({
+          id: 'bi_' + Date.now() + Math.random(),
+          product_id: it.product_id,
+          product_name: it.product_name,
+          hsn_sac: it.hsn_sac,
+          quantity: parseFloat(it.quantity),
+          rate: parseFloat(it.rate),
+          gst_rate: parseFloat(it.gst_rate),
+          discount_pct: parseFloat(it.discount_pct || 0),
+          amount: it.amount,
+        }))
+      }
+
+      const bill = await createBill(billData)
+      setSaved(bill)
+      setShowPrint(true)
+    } catch (e) {
+      alert('Failed to save bill: ' + e.message)
+    }
   }
 
   function handleReset() {
@@ -340,9 +364,10 @@ export default function Billing({ onNavigate }) {
         <table className="line-items-table" style={{ tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: 36 }} />        {/* Sr */}
-            <col style={{ width: '42%' }} />      {/* Product */}
-            <col style={{ width: '15%' }} />      {/* Qty */}
-            <col style={{ width: '18%' }} />      {/* Rate */}
+            <col style={{ width: '38%' }} />      {/* Product */}
+            <col style={{ width: '13%' }} />      {/* Qty */}
+            <col style={{ width: '15%' }} />      {/* Rate */}
+            <col style={{ width: '12%' }} />      {/* Discount */}
             <col style={{ width: '18%' }} />      {/* Amount */}
             <col style={{ width: 36 }} />         {/* Delete */}
           </colgroup>
@@ -352,6 +377,7 @@ export default function Billing({ onNavigate }) {
               <th>Product Name</th>
               <th>Qty</th>
               <th>Rate (₹)</th>
+              <th>Disc (%)</th>
               <th style={{ textAlign: 'right' }}>Amount (₹)</th>
               <th></th>
             </tr>
@@ -433,6 +459,17 @@ export default function Billing({ onNavigate }) {
                     />
                   </td>
 
+                  {/* Discount */}
+                  <td>
+                    <input
+                      className="form-input"
+                      type="number" min="0" step="0.01"
+                      placeholder="0"
+                      value={it.discount_pct}
+                      onChange={e => updateItem(idx, { discount_pct: e.target.value })}
+                    />
+                  </td>
+
                   {/* Amount (auto-calculated) */}
                   <td style={{ textAlign: 'right', paddingRight: 8 }}>
                     <div style={{
@@ -443,7 +480,7 @@ export default function Billing({ onNavigate }) {
                     </div>
                     {it.amount > 0 && it.gst_rate > 0 && (
                       <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>
-                        incl. GST ₹{fmt(parseFloat(it.rate || 0) * parseFloat(it.quantity || 0) * (it.gst_rate / 100))}
+                        incl. GST ({(it.gst_rate).toFixed(1)}%)
                       </div>
                     )}
                   </td>
@@ -470,14 +507,10 @@ export default function Billing({ onNavigate }) {
         <div className="card" style={{ minWidth: 360 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>Sub Total</span>
-              <span style={{ fontFamily: 'var(--font-mono)' }}>₹{fmt(subtotal)}</span>
-            </div>
-            <div className="divider" style={{ margin: '2px 0' }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-secondary)' }}>Taxable Amount</span>
               <span style={{ fontFamily: 'var(--font-mono)' }}>₹{fmt(subtotal)}</span>
             </div>
+            <div className="divider" style={{ margin: '2px 0' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-secondary)' }}>
                 Central Tax ({((items[0]?.gst_rate || 18) / 2).toFixed(1)}%)

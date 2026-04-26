@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext'
-import { getTopProducts } from '../lib/mockData'
+import { getTopProducts } from '../lib/analytics'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
@@ -17,7 +17,7 @@ const CustomTooltip = ({ active, payload, label }) => {
       <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>{label}</div>
       {payload.map(p => (
         <div key={p.name} style={{ color: p.color, fontWeight: 700 }}>
-          {p.name}: {p.name.includes('₹') || p.name === 'Revenue' ? '₹' : ''}{fmt(p.value)}
+          {p.name}: {p.name.includes('₹') || p.name === 'Revenue' || p.name === 'Purchases' ? '₹' : ''}{fmt(p.value)}
         </div>
       ))}
     </div>
@@ -25,30 +25,31 @@ const CustomTooltip = ({ active, payload, label }) => {
 }
 
 export default function Reports() {
-  const { bills, products } = useApp()
+  const { bills, purchases, products } = useApp()
   const [period, setPeriod] = useState('monthly')
 
   const invoices = bills.filter(b => b.type === 'invoice' && b.status === 'completed')
+  const completedPurchases = purchases.filter(b => b.status === 'completed')
 
   // Group by period
-  function groupBy(bills, p) {
+  function groupBy(invs, purs, p) {
     const map = {}
-    bills.forEach(b => {
+    invs.forEach(b => {
       const d = new Date(b.date)
-      let key
-      if (p === 'daily') key = b.date
-      else if (p === 'weekly') {
-        const week = Math.ceil(d.getDate() / 7)
-        key = `${d.getFullYear()}-W${String(week).padStart(2, '0')} (${d.toLocaleDateString('en-IN', { month: 'short' })})`
-      }
-      else if (p === 'monthly') key = d.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' })
-      else key = String(d.getFullYear())
-      map[key] = (map[key] || 0) + b.grand_total
+      let key = p === 'daily' ? b.date : p === 'monthly' ? d.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }) : String(d.getFullYear())
+      if (!map[key]) map[key] = { label: key, revenue: 0, purchases: 0 }
+      map[key].revenue += b.grand_total
     })
-    return Object.entries(map).map(([label, revenue]) => ({ label, revenue }))
+    purs.forEach(b => {
+      const d = new Date(b.date)
+      let key = p === 'daily' ? b.date : p === 'monthly' ? d.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }) : String(d.getFullYear())
+      if (!map[key]) map[key] = { label: key, revenue: 0, purchases: 0 }
+      map[key].purchases += b.grand_total
+    })
+    return Object.values(map)
   }
 
-  const revenueData = groupBy(invoices, period)
+  const revenueData = groupBy(invoices, completedPurchases, period)
 
   // Category revenue breakdown
   const categoryMap = {}
@@ -65,19 +66,56 @@ export default function Reports() {
 
   // Month-over-month
   const totalRevenue = invoices.reduce((s, b) => s + b.grand_total, 0)
-  const avgOrderValue = invoices.length ? totalRevenue / invoices.length : 0
+  const totalPurchases = completedPurchases.reduce((s, p) => s + p.grand_total, 0)
+  const outputGst = invoices.reduce((s, b) => s + b.total_gst, 0)
+  const inputGst = completedPurchases.reduce((s, p) => s + p.total_gst, 0)
 
-  function exportCSV() {
-    const rows = [['Bill No', 'Date', 'Customer', 'Type', 'Subtotal', 'GST', 'Grand Total', 'Status']]
-    bills.forEach(b => {
-      rows.push([`${b.type === 'invoice' ? 'INV' : 'DC'}-${String(b.bill_number).padStart(3, '0')}`,
-        b.date, b.customer_name, b.type, b.subtotal, b.total_gst, b.grand_total, b.status])
+  function exportGSTR1() {
+    const rows = [['GSTIN/UIN of Recipient', 'Receiver Name', 'Invoice Number', 'Invoice Date', 'Invoice Value', 'Place Of Supply', 'Reverse Charge', 'Notes', 'Invoice Type', 'Rate', 'Taxable Value']]
+    invoices.forEach(b => {
+      const rateMap = {}
+      b.items.forEach(it => {
+        const r = it.gst_rate || 18
+        const amt = it.amount // Without GST
+        if (!rateMap[r]) rateMap[r] = 0
+        rateMap[r] += amt
+      })
+      Object.entries(rateMap).forEach(([r, baseAmt]) => {
+        rows.push([
+          b.customer_gstin || '', b.customer_name, `INV-${b.bill_number}`, b.date, b.grand_total,
+          b.place_of_supply, 'N', '', 'Regular B2B/B2C', r, baseAmt.toFixed(2)
+        ])
+      })
     })
+    downloadCSV(rows, 'GSTR-1_Sales_Report.csv')
+  }
+
+  function exportGSTR2() {
+    const rows = [['GSTIN of Supplier', 'Supplier Name', 'Invoice Number', 'Invoice Date', 'Invoice Value', 'Place Of Supply', 'Reverse Charge', 'Invoice Type', 'Rate', 'Taxable Value']]
+    completedPurchases.forEach(b => {
+      const rateMap = {}
+      b.items.forEach(it => {
+        const r = it.gst_rate || 18
+        const amt = it.amount
+        if (!rateMap[r]) rateMap[r] = 0
+        rateMap[r] += amt
+      })
+      Object.entries(rateMap).forEach(([r, baseAmt]) => {
+        rows.push([
+          '', b.party_name, b.bill_number, b.date, b.grand_total,
+          '27-Maharashtra', 'N', 'Regular', r, baseAmt.toFixed(2)
+        ])
+      })
+    })
+    downloadCSV(rows, 'GSTR-2_Purchases_Report.csv')
+  }
+
+  function downloadCSV(rows, filename) {
     const csv = rows.map(r => r.join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url; a.download = 'bills_export.csv'; a.click()
+    a.href = url; a.download = filename; a.click()
     URL.revokeObjectURL(url)
   }
 
@@ -85,36 +123,51 @@ export default function Reports() {
     <div>
       <div className="page-header flex items-center justify-between" style={{ marginBottom: 24 }}>
         <div>
-          <h1>Reports</h1>
-          <p>Sales analytics and business insights</p>
+          <h1>Reports &amp; GST</h1>
+          <p>Sales, Purchases, and Tax Liability Insights</p>
         </div>
-        <button className="btn btn-secondary" onClick={exportCSV}>
-          <Download size={15} /> Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-secondary" onClick={exportGSTR1}>
+            <Download size={15} /> Export GSTR-1
+          </button>
+          <button className="btn btn-secondary" onClick={exportGSTR2}>
+            <Download size={15} /> Export GSTR-2
+          </button>
+        </div>
       </div>
 
       {/* Summary KPIs */}
       <div className="grid grid-4 gap-4 mb-6">
         {[
-          { label: 'Total Revenue', value: '₹' + fmt(totalRevenue), sub: `From ${invoices.length} invoices` },
-          { label: 'Avg Order Value', value: '₹' + fmt(avgOrderValue), sub: 'Per invoice' },
-          { label: 'Products Sold', value: invoices.reduce((s,b) => s + b.items.reduce((x,i) => x + i.quantity, 0), 0), sub: 'Total units' },
-          { label: 'Total GST', value: '₹' + fmt(invoices.reduce((s,b) => s + b.total_gst, 0)), sub: 'Collected' },
+          { label: 'Total Sales', value: '₹' + fmt(totalRevenue), color: 'var(--text-primary)', sub: `From ${invoices.length} invoices` },
+          { label: 'Total Purchases', value: '₹' + fmt(totalPurchases), color: 'var(--text-primary)', sub: `From ${completedPurchases.length} purchases` },
+          { label: 'Output GST (Collected)', value: '₹' + fmt(outputGst), color: 'var(--green)', sub: 'Payable to Govt' },
+          { label: 'Input GST (ITC)', value: '₹' + fmt(inputGst), color: 'var(--red)', sub: 'Claimable from Govt' },
         ].map(s => (
           <div key={s.label} className="card" style={{ padding: '16px 20px' }}>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{s.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 4 }}>{s.value}</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: s.color, marginBottom: 4 }}>{s.value}</div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{s.sub}</div>
           </div>
         ))}
       </div>
 
+      <div className="card mb-6" style={{ background: 'var(--bg-card)', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: '4px solid ' + (outputGst > inputGst ? 'var(--yellow)' : 'var(--green)')}}>
+        <div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Net GST Liability</div>
+          <div style={{ fontSize: 18, fontWeight: 700 }}>
+            {outputGst > inputGst ? 'Payment required: ' : 'Excess ITC: '} 
+            ₹{fmt(Math.abs(outputGst - inputGst))}
+          </div>
+        </div>
+      </div>
+
       {/* Period selector + chart */}
       <div className="card mb-6">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <div className="card-title" style={{ margin: 0 }}>Revenue Over Time</div>
-          <div className="tabs" style={{ width: 280 }}>
-            {['daily', 'weekly', 'monthly', 'yearly'].map(p => (
+          <div className="card-title" style={{ margin: 0 }}>Revenue &amp; Purchases Over Time</div>
+          <div className="tabs" style={{ width: 200 }}>
+            {['daily', 'monthly', 'yearly'].map(p => (
               <button key={p} className={`tab-btn ${period === p ? 'active' : ''}`}
                 onClick={() => setPeriod(p)}>
                 {p.charAt(0).toUpperCase() + p.slice(1)}
@@ -130,7 +183,8 @@ export default function Reports() {
               tickFormatter={v => `₹${v >= 1000 ? (v/1000).toFixed(0)+'k' : v}`}
               axisLine={false} tickLine={false} width={65} />
             <Tooltip content={<CustomTooltip />} />
-            <Bar dataKey="revenue" name="Revenue" fill="var(--accent)" radius={[4,4,0,0]} />
+            <Bar dataKey="revenue" name="Sales" fill="var(--accent)" radius={[4,4,0,0]} />
+            <Bar dataKey="purchases" name="Purchases" fill="var(--indigo)" radius={[4,4,0,0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -183,43 +237,6 @@ export default function Reports() {
             </div>
           )}
         </div>
-      </div>
-
-      {/* Monthly revenue table */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-          <div className="card-title" style={{ margin: 0 }}>All Bills Summary</div>
-        </div>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Bill No</th><th>Date</th><th>Customer</th><th>Type</th><th>Status</th>
-              <th className="num">Subtotal</th><th className="num">GST</th><th className="num">Grand Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {bills.map(b => (
-              <tr key={b.id}>
-                <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
-                  {b.type === 'invoice' ? 'INV' : 'DC'}-{String(b.bill_number).padStart(3, '0')}
-                </td>
-                <td style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-                  {new Date(b.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                </td>
-                <td>{b.customer_name}</td>
-                <td><span className={`badge ${b.type === 'invoice' ? 'badge-green' : 'badge-blue'}`}>{b.type}</span></td>
-                <td>
-                  <span className={`badge ${b.status === 'completed' ? 'badge-green' : b.status === 'pending' ? 'badge-yellow' : 'badge-gray'}`}>
-                    {b.status}
-                  </span>
-                </td>
-                <td className="num">₹{fmt(b.subtotal)}</td>
-                <td className="num">₹{fmt(b.total_gst)}</td>
-                <td className="num" style={{ fontWeight: 700 }}>₹{fmt(b.grand_total)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
     </div>
   )
