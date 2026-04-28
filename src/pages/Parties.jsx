@@ -251,8 +251,10 @@ export default function Parties() {
   const [ledgerParty, setLedgerParty] = useState(null)
   const [filterType, setFilterType] = useState('all')
   const [search, setSearch] = useState('')
+  const [limit, setLimit] = useState(50)
 
   const filtered = parties.filter(p => (filterType === 'all' || p.type === filterType) && p.name.toLowerCase().includes(search.toLowerCase()))
+  const displayParties = filtered.slice(0, limit)
 
   async function handleSave(data) {
     try {
@@ -301,7 +303,7 @@ export default function Parties() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map(p => {
+            {displayParties.map(p => {
               const bal = getPartyBalance(p.id)
               return (
                 <tr key={p.id}>
@@ -336,6 +338,14 @@ export default function Parties() {
           </tbody>
         </table>
       </div>
+
+      {filtered.length > limit && (
+        <div style={{ textAlign: 'center', marginTop: 20 }}>
+          <button className="btn btn-secondary" onClick={() => setLimit(prev => prev + 100)}>
+            Load More ({filtered.length - limit} remaining)
+          </button>
+        </div>
+      )}
 
       {(showAdd || editParty) && (
         <PartyModal party={editParty} onClose={() => { setShowAdd(false); setEditParty(null) }} onSave={handleSave} />

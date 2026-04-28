@@ -1,7 +1,7 @@
 {
   "name": "tally-software",
   "private": true,
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Tally Software Desktop Application",
   "author": "Aditya Singh",
   "type": "module",

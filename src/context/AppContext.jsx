@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 
 const AppContext = createContext(null)
@@ -180,19 +180,43 @@ export function AppProvider({ children }) {
     return data
   }
 
+  // Pre-calculate balances and groupings for performance
+  const partyMap = useMemo(() => {
+    const map = new Map()
+    parties.forEach(p => map.set(p.id, p))
+    return map
+  }, [parties])
+
+  const transactionsByParty = useMemo(() => {
+    const map = new Map()
+    transactions.forEach(t => {
+      if (!map.has(t.party_id)) map.set(t.party_id, [])
+      map.get(t.party_id).push(t)
+    })
+    return map
+  }, [transactions])
+
+  const partyBalances = useMemo(() => {
+    const balances = new Map()
+    parties.forEach(p => {
+      const txs = transactionsByParty.get(p.id) || []
+      let balance = 0
+      if (p.type === 'customer') {
+        balance = txs.reduce((sum, t) => sum + (t.type === 'invoice' ? parseFloat(t.amount) : t.type === 'receipt' ? -parseFloat(t.amount) : 0), 0)
+      } else {
+        balance = txs.reduce((sum, t) => sum + (t.type === 'purchase' ? parseFloat(t.amount) : t.type === 'payment' ? -parseFloat(t.amount) : 0), 0)
+      }
+      balances.set(p.id, balance)
+    })
+    return balances
+  }, [parties, transactionsByParty])
+
   function getPartyBalance(partyId) {
-    const txs = transactions.filter(t => t.party_id === partyId)
-    const party = parties.find(p => p.id === partyId)
-    if (!party) return 0
-    if (party.type === 'customer') {
-       return txs.reduce((sum, t) => sum + (t.type === 'invoice' ? parseFloat(t.amount) : t.type === 'receipt' ? -parseFloat(t.amount) : 0), 0)
-    } else {
-       return txs.reduce((sum, t) => sum + (t.type === 'purchase' ? parseFloat(t.amount) : t.type === 'payment' ? -parseFloat(t.amount) : 0), 0)
-    }
+    return partyBalances.get(partyId) || 0
   }
 
   function getPartyTransactions(partyId) {
-    return transactions.filter(t => t.party_id === partyId).sort((a,b) => new Date(b.date) - new Date(a.date))
+    return (transactionsByParty.get(partyId) || []).slice().sort((a,b) => new Date(b.date) - new Date(a.date))
   }
 
   // ── Purchases ────────────────────────────────────────────────
