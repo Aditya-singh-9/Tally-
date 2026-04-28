@@ -10,6 +10,17 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
+  // Listen for custom auth errors from AppContext
+  import { useEffect } from 'react'
+  useEffect(() => {
+    const handleAuthError = (e) => {
+      setError(e.detail)
+    }
+    window.addEventListener('auth-error', handleAuthError)
+    return () => window.removeEventListener('auth-error', handleAuthError)
+  }, [])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -32,9 +43,8 @@ export default function Login() {
       
       if (authError) {
         setError(authError.message)
-      } else if (!data.session) {
-        // If email confirmation is turned on in Supabase
-        setError('Account created! Please check your email to confirm verify your account.')
+      } else {
+        setSuccess('Account created! Please wait for an admin to approve your account before you can sign in.')
       }
     } else {
       const { error: authError } = await supabase.auth.signInWithPassword({
@@ -134,6 +144,19 @@ export default function Login() {
             </div>
           )}
 
+          {success && (
+            <div style={{
+              background: 'var(--green-bg)',
+              border: '1px solid rgba(16,185,129,0.2)',
+              borderRadius: 'var(--radius-md)',
+              padding: '10px 14px',
+              color: 'var(--green)',
+              fontSize: 13,
+            }}>
+              {success}
+            </div>
+          )}
+
           <button
             id="login-submit"
             type="submit"
@@ -152,7 +175,7 @@ export default function Login() {
           <button
             className="btn btn-ghost"
             style={{ padding: '2px 6px', fontSize: 13, color: 'var(--accent-light)' }}
-            onClick={() => { setIsSignup(v => !v); setError('') }}
+            onClick={() => { setIsSignup(v => !v); setError(''); setSuccess('') }}
           >
             {isSignup ? 'Sign In' : 'Sign Up'}
           </button>

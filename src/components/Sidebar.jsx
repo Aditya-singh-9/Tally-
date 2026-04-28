@@ -1,7 +1,7 @@
 import { useApp } from '../context/AppContext'
 import {
   LayoutDashboard, Package, FileText, History,
-  BarChart2, Settings, LogOut, AlertTriangle, Users, Truck
+  BarChart2, Settings, LogOut, AlertTriangle, Users, Truck, Shield
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -59,9 +59,24 @@ export default function Sidebar({ currentPage, onNavigate }) {
         </button>
       </div>
 
+      {profile?.role === 'admin' && (
+        <div style={{ padding: '0 12px', marginTop: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: 1, padding: '0 12px', marginBottom: 8 }}>
+            Administration
+          </div>
+          <button
+            className={`sidebar-link ${currentPage === 'admin' ? 'active' : ''}`}
+            onClick={() => onNavigate('admin')}
+          >
+            <Shield className="sidebar-icon" size={18} />
+            Admin Dashboard
+          </button>
+        </div>
+      )}
+
       {/* Low stock alert */}
       {lowStockCount > 0 && (
-        <div style={{ padding: '0 12px 12px' }}>
+        <div style={{ padding: '0 12px 12px', marginTop: 'auto' }}>
           <div style={{
             background: 'var(--yellow-bg)',
             border: '1px solid rgba(245,158,11,0.2)',

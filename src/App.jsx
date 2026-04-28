@@ -11,9 +11,11 @@ import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import Parties from './pages/Parties'
 import Purchases from './pages/Purchases'
+import AdminDashboard from './pages/AdminDashboard'
 
 const PAGES = {
   dashboard: { component: Dashboard, title: 'Dashboard' },
+  admin:     { component: AdminDashboard, title: 'Admin Panel' },
   inventory:  { component: Inventory,  title: 'Inventory' },
   billing:    { component: Billing,    title: 'New Sales Bill' },
   purchases:  { component: Purchases,  title: 'Purchase Voucher' },

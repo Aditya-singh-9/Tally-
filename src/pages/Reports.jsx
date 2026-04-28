@@ -70,6 +70,67 @@ export default function Reports() {
   const outputGst = invoices.reduce((s, b) => s + b.total_gst, 0)
   const inputGst = completedPurchases.reduce((s, p) => s + p.total_gst, 0)
 
+  // ── GST Computation (Tally Style) ──────────────────────────────
+  const gstSummary = { sales: {}, purchases: {} }
+
+  invoices.forEach(b => {
+    b.items.forEach(it => {
+      const rate = it.gst_rate || 18
+      const taxable = it.amount || 0
+      const tax = taxable * (rate / 100)
+      if (!gstSummary.sales[rate]) gstSummary.sales[rate] = { taxable: 0, tax: 0 }
+      gstSummary.sales[rate].taxable += taxable
+      gstSummary.sales[rate].tax += tax
+    })
+  })
+
+  completedPurchases.forEach(b => {
+    b.items.forEach(it => {
+      const rate = it.gst_rate || 18
+      const taxable = it.amount || 0
+      const tax = taxable * (rate / 100)
+      if (!gstSummary.purchases[rate]) gstSummary.purchases[rate] = { taxable: 0, tax: 0 }
+      gstSummary.purchases[rate].taxable += taxable
+      gstSummary.purchases[rate].tax += tax
+    })
+  })
+
+  const salesRates = Object.keys(gstSummary.sales).sort((a, b) => Number(a) - Number(b))
+  const purchaseRates = Object.keys(gstSummary.purchases).sort((a, b) => Number(a) - Number(b))
+
+  const totalSalesTaxable = salesRates.reduce((sum, r) => sum + gstSummary.sales[r].taxable, 0)
+  const totalPurchaseTaxable = purchaseRates.reduce((sum, r) => sum + gstSummary.purchases[r].taxable, 0)
+
+  function exportGSTComputation() {
+    const rows = [
+      ['GST Computation Summary (GSTR-3B Style)'],
+      [],
+      ['Outward Supplies (Sales)'],
+      ['GST Rate', 'Taxable Value', 'Tax Amount (Output)']
+    ]
+    
+    salesRates.forEach(r => {
+      rows.push([`${r}%`, gstSummary.sales[r].taxable.toFixed(2), gstSummary.sales[r].tax.toFixed(2)])
+    })
+    rows.push(['Total Sales', totalSalesTaxable.toFixed(2), outputGst.toFixed(2)])
+    
+    rows.push([])
+    rows.push(['Inward Supplies (Purchases)'])
+    rows.push(['GST Rate', 'Taxable Value', 'Tax Amount (Input ITC)'])
+    
+    purchaseRates.forEach(r => {
+      rows.push([`${r}%`, gstSummary.purchases[r].taxable.toFixed(2), gstSummary.purchases[r].tax.toFixed(2)])
+    })
+    rows.push(['Total Purchases', totalPurchaseTaxable.toFixed(2), inputGst.toFixed(2)])
+    
+    rows.push([])
+    rows.push(['Net Liability'])
+    const net = outputGst - inputGst
+    rows.push([net >= 0 ? 'GST Payable' : 'Excess ITC', '', Math.abs(net).toFixed(2)])
+
+    downloadCSV(rows, 'GST_Computation.csv')
+  }
+
   function exportGSTR1() {
     const rows = [['GSTIN/UIN of Recipient', 'Receiver Name', 'Invoice Number', 'Invoice Date', 'Invoice Value', 'Place Of Supply', 'Reverse Charge', 'Notes', 'Invoice Type', 'Rate', 'Taxable Value']]
     invoices.forEach(b => {
@@ -128,10 +189,13 @@ export default function Reports() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-secondary" onClick={exportGSTR1}>
-            <Download size={15} /> Export GSTR-1
+            <Download size={15} /> GSTR-1
           </button>
           <button className="btn btn-secondary" onClick={exportGSTR2}>
-            <Download size={15} /> Export GSTR-2
+            <Download size={15} /> GSTR-2
+          </button>
+          <button className="btn btn-primary" onClick={exportGSTComputation}>
+            <Download size={15} /> Export Computation (Excel)
           </button>
         </div>
       </div>
@@ -159,6 +223,83 @@ export default function Reports() {
             {outputGst > inputGst ? 'Payment required: ' : 'Excess ITC: '} 
             ₹{fmt(Math.abs(outputGst - inputGst))}
           </div>
+        </div>
+      </div>
+
+      {/* Tally-Style GST Computation */}
+      <div className="grid gap-6 mb-6" style={{ gridTemplateColumns: '1fr 1fr' }}>
+        {/* Output Tax (Sales) */}
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)' }}>
+            <div className="card-title" style={{ margin: 0, color: 'var(--text-primary)' }}>Outward Supplies (Sales)</div>
+          </div>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th style={{ paddingLeft: 20 }}>GST Rate</th>
+                <th className="num">Taxable Value</th>
+                <th className="num" style={{ paddingRight: 20 }}>Tax Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {salesRates.map(r => (
+                <tr key={r}>
+                  <td style={{ paddingLeft: 20, fontWeight: 600, color: 'var(--accent)' }}>{r}%</td>
+                  <td className="num">₹{fmt(gstSummary.sales[r].taxable)}</td>
+                  <td className="num" style={{ paddingRight: 20, fontWeight: 500 }}>₹{fmt(gstSummary.sales[r].tax)}</td>
+                </tr>
+              ))}
+              {salesRates.length === 0 && (
+                <tr><td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>No sales data</td></tr>
+              )}
+            </tbody>
+            {salesRates.length > 0 && (
+              <tfoot style={{ borderTop: '2px solid var(--border)', background: 'var(--bg-secondary)' }}>
+                <tr>
+                  <td style={{ padding: '12px 20px', fontWeight: 700 }}>Total Output</td>
+                  <td className="num" style={{ fontWeight: 700 }}>₹{fmt(totalSalesTaxable)}</td>
+                  <td className="num" style={{ paddingRight: 20, fontWeight: 700, color: 'var(--green)' }}>₹{fmt(outputGst)}</td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+
+        {/* Input Tax (Purchases) */}
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)' }}>
+            <div className="card-title" style={{ margin: 0, color: 'var(--text-primary)' }}>Inward Supplies (Purchases)</div>
+          </div>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th style={{ paddingLeft: 20 }}>GST Rate</th>
+                <th className="num">Taxable Value</th>
+                <th className="num" style={{ paddingRight: 20 }}>Tax (ITC)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {purchaseRates.map(r => (
+                <tr key={r}>
+                  <td style={{ paddingLeft: 20, fontWeight: 600, color: 'var(--indigo)' }}>{r}%</td>
+                  <td className="num">₹{fmt(gstSummary.purchases[r].taxable)}</td>
+                  <td className="num" style={{ paddingRight: 20, fontWeight: 500 }}>₹{fmt(gstSummary.purchases[r].tax)}</td>
+                </tr>
+              ))}
+              {purchaseRates.length === 0 && (
+                <tr><td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>No purchase data</td></tr>
+              )}
+            </tbody>
+            {purchaseRates.length > 0 && (
+              <tfoot style={{ borderTop: '2px solid var(--border)', background: 'var(--bg-secondary)' }}>
+                <tr>
+                  <td style={{ padding: '12px 20px', fontWeight: 700 }}>Total ITC</td>
+                  <td className="num" style={{ fontWeight: 700 }}>₹{fmt(totalPurchaseTaxable)}</td>
+                  <td className="num" style={{ paddingRight: 20, fontWeight: 700, color: 'var(--red)' }}>₹{fmt(inputGst)}</td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
         </div>
       </div>
 

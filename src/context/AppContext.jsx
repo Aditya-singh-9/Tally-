@@ -59,7 +59,21 @@ export function AppProvider({ children }) {
         supabase.from('transactions').select('*').order('date', { ascending: false })
       ])
 
-      setProfile(profData || {})
+      const profile = profData || {}
+      setProfile(profile)
+      
+      // Check if user is approved
+      if (profile.status === 'pending') {
+        await supabase.auth.signOut()
+        setUser(null)
+        setIsAuthenticated(false)
+        setProfile(null)
+        setLoadingInitial(false)
+        // Disptach a custom event so Login.jsx knows why they were logged out
+        window.dispatchEvent(new CustomEvent('auth-error', { detail: 'Your account is pending admin approval.' }))
+        return
+      }
+
       setProducts(prodData || [])
       setParties(partData || [])
       setBills(billData || [])
@@ -79,6 +93,17 @@ export function AppProvider({ children }) {
       ...updates 
     }).select().single()
     if (!error && data) setProfile(data)
+  // ── Admin Actions ──────────────────────────────────────────────
+  async function getAllProfiles() {
+    if (profile?.role !== 'admin') return []
+    const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
+    return data || []
+  }
+
+  async function updateUserStatus(userId, status) {
+    if (profile?.role !== 'admin') return
+    const { error } = await supabase.from('profiles').update({ status }).eq('id', userId)
+    if (error) throw error
   }
 
   // ── Products ──────────────────────────────────────────────────
@@ -302,6 +327,7 @@ export function AppProvider({ children }) {
   return (
     <AppContext.Provider value={{
       user, profile, updateProfile, setProfile,
+      getAllProfiles, updateUserStatus,
       products, addProduct, updateProduct, deleteProduct,
       parties, addParty, updateParty,
       purchases, createPurchase,

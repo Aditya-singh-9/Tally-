@@ -6,11 +6,13 @@ drop function if exists public.handle_new_user();
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, email, business_name)
+  insert into public.profiles (id, email, business_name, status, role)
   values (
     new.id, 
     new.email, 
-    COALESCE(new.raw_user_meta_data->>'business_name', 'My Business')
+    COALESCE(new.raw_user_meta_data->>'business_name', 'My Business'),
+    'pending',
+    'user'
   );
   return new;
 end;

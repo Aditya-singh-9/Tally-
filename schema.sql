@@ -14,6 +14,8 @@ create table public.profiles (
   bank_name text,
   bank_account text,
   ifsc_code text,
+  status text default 'pending',
+  role text default 'user',
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -22,6 +24,14 @@ alter table public.profiles enable row level security;
 create policy "Users can view own profile." on public.profiles for select using (auth.uid() = id);
 create policy "Users can insert own profile." on public.profiles for insert with check (auth.uid() = id);
 create policy "Users can update own profile." on public.profiles for update using (auth.uid() = id);
+
+-- Admins can view and update all profiles
+create policy "Admins can view all profiles" on public.profiles for select using (
+  (select role from public.profiles where id = auth.uid()) = 'admin'
+);
+create policy "Admins can update all profiles" on public.profiles for update using (
+  (select role from public.profiles where id = auth.uid()) = 'admin'
+);
 
 -- ==========================================
 -- 2. PRODUCTS (Inventory)
