@@ -11,7 +11,6 @@ export default async function handler(req, res) {
 
   const headers = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36' };
 
-  // Scraping Multiple Sources Parallely to bypass blocks and increase reliability
   const sources = [
     fetch(`https://www.bing.com/search?q=GSTIN+${gstin}+details`, { headers }),
     fetch(`https://search.yahoo.com/search?p=GSTIN+${gstin}+details`, { headers }),
@@ -20,13 +19,16 @@ export default async function handler(req, res) {
 
   try {
     const results = await Promise.allSettled(sources);
-    
+    const successfullyFetchedTexts = [];
+
+    // Process all results once
     for (const result of results) {
       if (result.status === 'fulfilled' && result.value.ok) {
         const html = await result.value.text();
-        const text = html.replace(/<[^>]*>?/gm, ' '); // Strip HTML
+        successfullyFetchedTexts.push(html);
         
-        // Regex patterns
+        const text = html.replace(/<[^>]*>?/gm, ' ');
+        
         const nameMatch = text.match(/(?:Legal Name|Trade Name|Business Name|Name of Business)\s*[:\-]?\s*([A-Z0-9\s\.\-\&]{3,50})(?:\s{2,}|GSTIN|Address|Principal|Date)/i);
         const addressMatch = text.match(/(?:Principal Place of Business|Address|Location)\s*[:\-]?\s*([A-Z0-9\s\,\.\-\/\(\)]{10,100})(?:\s{2,}|GSTIN|Legal|Date)/i);
 
@@ -39,19 +41,16 @@ export default async function handler(req, res) {
       }
     }
     
-    // If exact regex fails, do a generic snippet fallback on the first successful response
-    for (const result of results) {
-      if (result.status === 'fulfilled' && result.value.ok) {
-        const html = await result.value.text();
-        const text = html.replace(/<[^>]*>?/gm, ' ');
-        const snippetMatch = text.match(new RegExp(`(?:${gstin}).{1,30}([A-Z\\s\\&\\.\\-]{5,40})`, 'i'));
-        if (snippetMatch) {
-          return res.status(200).json({ name: snippetMatch[1].trim(), address: 'Address not found' });
-        }
+    // Fallback logic using already-read text strings
+    for (const html of successfullyFetchedTexts) {
+      const text = html.replace(/<[^>]*>?/gm, ' ');
+      const snippetMatch = text.match(new RegExp(`(?:${gstin}).{1,30}([A-Z\\s\\&\\.\\-]{5,40})`, 'i'));
+      if (snippetMatch) {
+        return res.status(200).json({ name: snippetMatch[1].trim(), address: 'Address not found' });
       }
     }
 
-    return res.status(404).json({ error: 'Could not extract details automatically. All sources failed or blocked.' });
+    return res.status(404).json({ error: 'Could not extract details. All sources failed or blocked.' });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
