@@ -149,6 +149,50 @@ export default function Billing({ onNavigate }) {
   async function handleSave() {
     if (!validate()) return
 
+    // ── CHALLAN: print-only, never saved to database ──────────
+    if (billType === 'challan') {
+      const challanItems = items
+        .filter(it => it.product_name && it.quantity && it.rate)
+        .map(it => ({
+          id: 'ci_' + Date.now() + Math.random(),
+          product_id: it.product_id,
+          product_name: it.product_name,
+          hsn_sac: it.hsn_sac,
+          quantity: parseFloat(it.quantity),
+          rate: parseFloat(it.rate),
+          gst_rate: parseFloat(it.gst_rate),
+          discount_pct: parseFloat(it.discount_pct || 0),
+          amount: it.amount,
+        }))
+
+      // Generate a local challan number (max existing + 1, no DB write)
+      const localNum = (bills.filter(b => b.type === 'challan')
+        .reduce((m, b) => Math.max(m, b.bill_number), 0)) + 1
+
+      const challanBill = {
+        id: 'local_' + Date.now(),
+        type: 'challan',
+        bill_number: localNum,
+        status: 'print_only',          // never stored
+        customer_name: customerInput,
+        customer_address: customerAddress,
+        customer_gstin: customerGstin,
+        place_of_supply: placeOfSupply,
+        date,
+        subtotal,
+        total_gst: totalGst,
+        grand_total: grandTotalRounded,
+        round_off: roundOff,
+        notes,
+        items: challanItems,
+      }
+
+      setSaved(challanBill)
+      setShowPrint(true)
+      return  // ← exit here: no DB call, no stock deduction
+    }
+
+    // ── INVOICE: save to database as usual ────────────────────
     try {
       let finalPartyId = customerId
       if (!finalPartyId && customerInput) {
@@ -162,8 +206,8 @@ export default function Billing({ onNavigate }) {
       }
 
       const billData = {
-        type: billType,
-        status: billType === 'invoice' ? 'completed' : 'pending',
+        type: 'invoice',
+        status: 'completed',
         party_id: finalPartyId,
         customer_name: customerInput,
         customer_address: customerAddress,
@@ -192,7 +236,7 @@ export default function Billing({ onNavigate }) {
       setSaved(bill)
       setShowPrint(true)
     } catch (e) {
-      alert('Failed to save bill: ' + e.message)
+      alert('Failed to save invoice: ' + e.message)
     }
   }
 
@@ -217,8 +261,11 @@ export default function Billing({ onNavigate }) {
           <button className="btn btn-ghost" onClick={() => onNavigate('history')}>
             View Bill History
           </button>
-          <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--green)', fontWeight: 600 }}>
-            ✓ {billType === 'invoice' ? 'Invoice' : 'Challan'} #{String(saved.bill_number).padStart(3, '0')} saved!
+          <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 600, color: billType === 'invoice' ? 'var(--green)' : 'var(--yellow)' }}>
+            {billType === 'invoice'
+              ? `✓ Invoice #${String(saved.bill_number).padStart(3, '0')} saved!`
+              : `🖨 Challan #${String(saved.bill_number).padStart(3, '0')} — Print only (not stored)`
+            }
           </span>
         </div>
 

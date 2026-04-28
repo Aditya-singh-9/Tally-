@@ -820,12 +820,12 @@ input, textarea, select, button { font-family: inherit; font-size: inherit; }
   left: var(--sidebar-width);
   right: 0;
   height: var(--topbar-height);
-  background: rgba(255,255,255,0.9);
+  background: rgba(255,255,255,0.92);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  padding: 0 var(--space-8);
+  padding: 0 var(--space-6);
   z-index: 90;
   gap: var(--space-4);
 }
@@ -834,14 +834,199 @@ input, textarea, select, button { font-family: inherit; font-size: inherit; }
   font-size: var(--text-md);
   font-weight: 700;
   color: var(--text-primary);
-  flex: 1;
+  white-space: nowrap;
+  min-width: 120px;
 }
 
 .topbar-actions {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  flex-shrink: 0;
 }
+
+/* ── Topbar Global Stock Search ──────────────────────────────── */
+.topbar-search-wrap {
+  flex: 1;
+  max-width: 480px;
+  position: relative;
+}
+
+.topbar-search-bar {
+  display: flex;
+  align-items: center;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0 0 0 10px;
+  gap: 6px;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  height: 36px;
+}
+
+.topbar-search-bar:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  background: var(--bg-surface);
+}
+
+.topbar-search-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.topbar-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  padding: 0;
+  min-width: 0;
+}
+
+.topbar-search-input::placeholder { color: var(--text-muted); }
+
+.topbar-search-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition), background var(--transition);
+  flex-shrink: 0;
+}
+.topbar-search-clear:hover { color: var(--text-primary); background: var(--bg-hover); }
+
+.topbar-search-btn {
+  height: 36px;
+  padding: 0 14px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 0 calc(var(--radius-md) - 2px) calc(var(--radius-md) - 2px) 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--transition);
+  letter-spacing: 0.01em;
+}
+.topbar-search-btn:hover { background: var(--accent-light); }
+
+/* Dropdown */
+.topbar-search-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 200;
+  overflow: hidden;
+  animation: slideUp 0.15s ease;
+}
+
+.topbar-search-header {
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--border-light);
+  background: var(--bg-elevated);
+}
+
+.topbar-search-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition);
+  border-bottom: 1px solid var(--border-light);
+  gap: 12px;
+}
+.topbar-search-item:last-of-type { border-bottom: none; }
+.topbar-search-item:hover { background: var(--bg-elevated); }
+
+.topbar-search-item-left { flex: 1; min-width: 0; }
+
+.topbar-search-item-name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbar-search-item-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  font-family: var(--font-mono);
+}
+
+.topbar-search-item-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.topbar-search-qty {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.topbar-search-status {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.topbar-search-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 14px;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.topbar-search-view-all {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border);
+  color: var(--accent);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.topbar-search-view-all:hover { background: var(--bg-hover); }
 
 /* ── Notification Dot ────────────────────────────────────────── */
 .notif-dot {
