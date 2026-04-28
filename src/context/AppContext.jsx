@@ -108,11 +108,13 @@ export function AppProvider({ children }) {
   }
 
   // ── Products ──────────────────────────────────────────────────
-  async function addProduct(product) {
-    const { data, error } = await supabase.from('products').insert({
-      ...product, user_id: user.id
-    }).select().single()
-    if (!error && data) setProducts(prev => [data, ...prev])
+    return data
+  }
+
+  async function addProductsBulk(productsList) {
+    const records = productsList.map(p => ({ ...p, user_id: user.id }))
+    const { data, error } = await supabase.from('products').insert(records).select()
+    if (!error && data) setProducts(prev => [...data, ...prev])
     return data
   }
 
@@ -144,11 +146,13 @@ export function AppProvider({ children }) {
   }
 
   // ── Parties ─────────────────────────────────────────────────
-  async function addParty(party) {
-    const { data, error } = await supabase.from('parties').insert({
-      ...party, user_id: user.id
-    }).select().single()
-    if (!error && data) setParties(prev => [data, ...prev])
+    return data
+  }
+
+  async function addPartiesBulk(partiesList) {
+    const records = partiesList.map(p => ({ ...p, user_id: user.id }))
+    const { data, error } = await supabase.from('parties').insert(records).select()
+    if (!error && data) setParties(prev => [...data, ...prev])
     return data
   }
 
@@ -329,8 +333,8 @@ export function AppProvider({ children }) {
     <AppContext.Provider value={{
       user, profile, updateProfile, setProfile,
       getAllProfiles, updateUserStatus,
-      products, addProduct, updateProduct, deleteProduct,
-      parties, addParty, updateParty,
+      products, addProduct, addProductsBulk, updateProduct, deleteProduct,
+      parties, addParty, addPartiesBulk, updateParty,
       purchases, createPurchase,
       transactions, addTransaction, getPartyBalance, getPartyTransactions,
       bills, createBill, convertChallanToInvoice, deleteBill,

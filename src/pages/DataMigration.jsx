@@ -7,7 +7,7 @@ import { XMLParser } from 'fast-xml-parser'
 import * as shapefile from 'shapefile'
 
 export default function DataMigration() {
-  const { addParty, addProduct } = useApp()
+  const { addPartiesBulk, addProductsBulk } = useApp()
   const [file, setFile] = useState(null)
   const [dataPreview, setDataPreview] = useState([])
   const [importType, setImportType] = useState('parties') // 'parties' or 'products'
@@ -144,47 +144,56 @@ export default function DataMigration() {
     
     let successCount = 0
     let failCount = 0
+    const CHUNK_SIZE = 500
 
-    for (let i = 0; i < dataPreview.length; i++) {
-      const row = dataPreview[i]
-      try {
-        if (importType === 'parties') {
-          // Smart column mapping
-          const name = row['Party Name'] || row['Name'] || row['LEDGERNAME'] || row['Customer Name'] || row['Supplier Name'] || Object.values(row)[0]
-          if (!name) { failCount++; continue }
-          
-          const group = String(row['Type'] || row['Group'] || row['Parent'] || '').toLowerCase()
-          const isSupplier = group.includes('creditor') || group.includes('supplier') || group.includes('purchase')
-          
-          await addParty({
-            name: String(name),
-            type: isSupplier ? 'supplier' : 'customer',
-            gstin: row['GSTIN'] || row['GSTIN/UIN'] || row['GST No'] || '',
-            phone: row['Phone'] || row['Mobile'] || row['Contact'] || '',
-            address: row['Address'] || row['Location'] || ''
-          })
-        } else if (importType === 'products') {
-          const name = row['Item Name'] || row['Name'] || row['STOCKITEMNAME'] || row['Product Name'] || Object.values(row)[0]
-          if (!name) { failCount++; continue }
-          
-          await addProduct({
-            name: String(name),
-            category: row['Category'] || row['Group'] || 'Imported',
-            hsn_sac: String(row['HSN'] || row['HSN/SAC'] || row['HSN Code'] || ''),
-            price: parseFloat(row['Rate'] || row['Price'] || row['Standard Price'] || row['Sale Price'] || 0),
-            gst_rate: parseFloat(row['GST Rate'] || row['GST%'] || row['Tax'] || 18),
-            quantity: parseFloat(row['Quantity'] || row['Closing Balance'] || row['Qty'] || row['Stock'] || 0)
-          })
+    try {
+      for (let i = 0; i < dataPreview.length; i += CHUNK_SIZE) {
+        const chunk = dataPreview.slice(i, i + CHUNK_SIZE)
+        const batchToInsert = []
+
+        for (const row of chunk) {
+          if (importType === 'parties') {
+            const name = row['Party Name'] || row['Name'] || row['LEDGERNAME'] || row['Customer Name'] || row['Supplier Name'] || Object.values(row)[0]
+            if (!name) continue
+            
+            const group = String(row['Type'] || row['Group'] || row['Parent'] || '').toLowerCase()
+            const isSupplier = group.includes('creditor') || group.includes('supplier') || group.includes('purchase')
+            
+            batchToInsert.push({
+              name: String(name),
+              type: isSupplier ? 'supplier' : 'customer',
+              gstin: row['GSTIN'] || row['GSTIN/UIN'] || row['GST No'] || '',
+              phone: row['Phone'] || row['Mobile'] || row['Contact'] || '',
+              address: row['Address'] || row['Location'] || ''
+            })
+          } else {
+            const name = row['Item Name'] || row['Name'] || row['STOCKITEMNAME'] || row['Product Name'] || Object.values(row)[0]
+            if (!name) continue
+            
+            batchToInsert.push({
+              name: String(name),
+              category: row['Category'] || row['Group'] || 'Imported',
+              hsn_sac: String(row['HSN'] || row['HSN/SAC'] || row['HSN Code'] || ''),
+              price: parseFloat(row['Rate'] || row['Price'] || row['Standard Price'] || row['Sale Price'] || 0),
+              gst_rate: parseFloat(row['GST Rate'] || row['GST%'] || row['Tax'] || 18),
+              quantity: parseFloat(row['Quantity'] || row['Closing Balance'] || row['Qty'] || row['Stock'] || 0)
+            })
+          }
         }
-        successCount++
-      } catch (err) {
-        failCount++
-        console.error('Row import failed', row, err)
+
+        if (batchToInsert.length > 0) {
+          logMsg(`Inserting batch ${Math.floor(i / CHUNK_SIZE) + 1} (${batchToInsert.length} records)...`)
+          if (importType === 'parties') await addPartiesBulk(batchToInsert)
+          else await addProductsBulk(batchToInsert)
+          successCount += batchToInsert.length
+        }
       }
+      logMsg(`Import Complete! Successfully added: ${successCount} records.`, 'success')
+    } catch (err) {
+      logMsg(`Import failed at batch ${Math.floor(successCount / CHUNK_SIZE) + 1}: ${err.message}`, 'error')
+    } finally {
+      setLoading(false)
     }
-    
-    logMsg(`Import Complete! Added: ${successCount}. Failed: ${failCount}`, successCount > 0 ? 'success' : 'error')
-    setLoading(false)
   }
 
   function clearData() {
