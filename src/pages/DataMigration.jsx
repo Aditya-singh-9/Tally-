@@ -4,7 +4,7 @@ import { Upload, Database, CheckCircle, AlertTriangle, FileText, ArrowRight, X }
 import * as XLSX from 'xlsx'
 import JSZip from 'jszip'
 import { XMLParser } from 'fast-xml-parser'
-import { DBFReader } from 'dbf-reader'
+import DBFReader from 'dbf-reader'
 
 export default function DataMigration() {
   const { addParty, addProduct } = useApp()
@@ -51,8 +51,8 @@ export default function DataMigration() {
             } else if (innerExt === 'dbf') {
               logMsg(`Found DBF inside zip: ${relativePath}`)
               const content = await zip.files[relativePath].async('arraybuffer')
-              const dbf = new DBFReader(content)
-              const rows = dbf.readRecords()
+              const dbf = DBFReader.read(content)
+              const rows = dbf?.rows || []
               setDataPreview(rows)
               logMsg(`Successfully parsed ${rows.length} records from DBF inside ZIP.`, 'success')
               foundData = true
@@ -74,8 +74,8 @@ export default function DataMigration() {
       } else if (ext === 'dbf') {
         logMsg('Parsing dBase (DBF) file...')
         const buffer = await uploaded.arrayBuffer()
-        const dbf = new DBFReader(buffer)
-        const rows = dbf.readRecords()
+        const dbf = DBFReader.read(buffer)
+        const rows = dbf?.rows || []
         setDataPreview(rows)
         logMsg(`Successfully parsed ${rows.length} records from DBF file.`, 'success')
       } else {
