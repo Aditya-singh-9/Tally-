@@ -43,23 +43,34 @@ function PartyModal({ party, onClose, onSave }) {
           }))
         }
       } else {
-        // Fallback: Invisible Browser Scraper
-        if (!window.electronAPI || !window.electronAPI.scrapeGSTIN) {
-          alert('Invisible scraper is not available in this environment. Please run the desktop app.')
-          setFetchingGst(false)
-          return
-        }
-        
-        const data = await window.electronAPI.scrapeGSTIN(form.gstin)
-        
-        if (data.error) {
-          alert(data.error)
+        // Fallback: Invisible Browser Scraper (Desktop) OR Vercel API (Web)
+        if (window.electronAPI && window.electronAPI.scrapeGSTIN) {
+          const data = await window.electronAPI.scrapeGSTIN(form.gstin)
+          if (data.error) alert(data.error)
+          else {
+            setForm(prev => ({
+              ...prev,
+              name: data.name || prev.name,
+              address: data.address || prev.address
+            }))
+          }
         } else {
-          setForm(prev => ({
-            ...prev,
-            name: data.name || prev.name,
-            address: data.address || prev.address
-          }))
+          // Web Environment (Vercel) Fallback
+          try {
+            const res = await fetch(`/api/scrape-gstin?gstin=${form.gstin}`)
+            const data = await res.json()
+            if (res.ok && !data.error) {
+              setForm(prev => ({
+                ...prev,
+                name: data.name || prev.name,
+                address: data.address || prev.address
+              }))
+            } else {
+              alert(data.error || 'Failed to fetch details on the web version.')
+            }
+          } catch(e) {
+            alert('Web fetch error. Make sure Vercel serverless functions are deployed.')
+          }
         }
       }
     } catch (err) {
