@@ -108,6 +108,11 @@ export function AppProvider({ children }) {
   }
 
   // ── Products ──────────────────────────────────────────────────
+  async function addProduct(product) {
+    const { data, error } = await supabase.from('products').insert({
+      ...product, user_id: user.id
+    }).select().single()
+    if (!error && data) setProducts(prev => [data, ...prev])
     return data
   }
 
@@ -146,6 +151,11 @@ export function AppProvider({ children }) {
   }
 
   // ── Parties ─────────────────────────────────────────────────
+  async function addParty(party) {
+    const { data, error } = await supabase.from('parties').insert({
+      ...party, user_id: user.id
+    }).select().single()
+    if (!error && data) setParties(prev => [data, ...prev])
     return data
   }
 

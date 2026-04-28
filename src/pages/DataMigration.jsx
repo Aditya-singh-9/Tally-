@@ -144,7 +144,8 @@ export default function DataMigration() {
     
     let successCount = 0
     let failCount = 0
-    const CHUNK_SIZE = 500
+    const CHUNK_SIZE = 100
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 
     try {
       for (let i = 0; i < dataPreview.length; i += CHUNK_SIZE) {
@@ -186,6 +187,9 @@ export default function DataMigration() {
           if (importType === 'parties') await addPartiesBulk(batchToInsert)
           else await addProductsBulk(batchToInsert)
           successCount += batchToInsert.length
+          
+          // Give the server a small breather
+          await sleep(500)
         }
       }
       logMsg(`Import Complete! Successfully added: ${successCount} records.`, 'success')
