@@ -13,6 +13,7 @@ import Parties from './pages/Parties'
 import Purchases from './pages/Purchases'
 import AdminDashboard from './pages/AdminDashboard'
 import GSTReports from './pages/GSTReports'
+import DataMigration from './pages/DataMigration'
 
 const PAGES = {
   dashboard: { component: Dashboard, title: 'Dashboard' },
@@ -24,6 +25,7 @@ const PAGES = {
   history:    { component: BillHistory, title: 'Bill History' },
   gst:        { component: GSTReports, title: 'GST Summary' },
   reports:    { component: Reports,    title: 'Reports & Analytics' },
+  migration:  { component: DataMigration, title: 'Data Migration' },
   settings:   { component: Settings,   title: 'Settings' },
 }
 

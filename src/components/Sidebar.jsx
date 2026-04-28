@@ -1,7 +1,7 @@
 import { useApp } from '../context/AppContext'
 import {
   LayoutDashboard, Package, FileText, History,
-  BarChart2, Settings, LogOut, AlertTriangle, Users, Truck, Shield, Calculator
+  BarChart2, Settings, LogOut, AlertTriangle, Users, Truck, Shield, Calculator, Database
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { id: 'history',   label: 'Bill History', icon: History },
   { id: 'gst',       label: 'GST Summary',  icon: Calculator },
   { id: 'reports',   label: 'Reports',      icon: BarChart2 },
+  { id: 'migration', label: 'Data Import',  icon: Database },
 ]
 
 export default function Sidebar({ currentPage, onNavigate }) {
