@@ -4,7 +4,7 @@ import { Upload, Database, CheckCircle, AlertTriangle, FileText, ArrowRight, X }
 import * as XLSX from 'xlsx'
 import JSZip from 'jszip'
 import { XMLParser } from 'fast-xml-parser'
-import * as DBFReader from 'dbf-reader'
+import * as shapefile from 'shapefile'
 
 export default function DataMigration() {
   const { addParty, addProduct } = useApp()
@@ -51,9 +51,12 @@ export default function DataMigration() {
             } else if (innerExt === 'dbf') {
               logMsg(`Found DBF inside zip: ${relativePath}`)
               const content = await zip.files[relativePath].async('arraybuffer')
-              const reader = DBFReader.read ? DBFReader : (DBFReader.default || DBFReader)
-              const dbf = reader.read(content)
-              const rows = dbf?.rows || []
+              const source = await shapefile.openDbf(content)
+              const rows = []
+              let result
+              while (!(result = await source.read()).done) {
+                rows.push(result.value)
+              }
               setDataPreview(rows)
               logMsg(`Successfully parsed ${rows.length} records from DBF inside ZIP.`, 'success')
               foundData = true
@@ -75,9 +78,12 @@ export default function DataMigration() {
       } else if (ext === 'dbf') {
         logMsg('Parsing dBase (DBF) file...')
         const buffer = await uploaded.arrayBuffer()
-        const reader = DBFReader.read ? DBFReader : (DBFReader.default || DBFReader)
-        const dbf = reader.read(buffer)
-        const rows = dbf?.rows || []
+        const source = await shapefile.openDbf(buffer)
+        const rows = []
+        let result
+        while (!(result = await source.read()).done) {
+          rows.push(result.value)
+        }
         setDataPreview(rows)
         logMsg(`Successfully parsed ${rows.length} records from DBF file.`, 'success')
       } else {
