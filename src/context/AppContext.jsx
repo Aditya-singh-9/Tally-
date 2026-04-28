@@ -93,6 +93,7 @@ export function AppProvider({ children }) {
       ...updates 
     }).select().single()
     if (!error && data) setProfile(data)
+  }
   // ── Admin Actions ──────────────────────────────────────────────
   async function getAllProfiles() {
     if (profile?.role !== 'admin') return []

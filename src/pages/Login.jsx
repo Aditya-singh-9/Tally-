@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { Eye, EyeOff, Zap } from 'lucide-react'
 
@@ -13,7 +13,6 @@ export default function Login() {
   const [success, setSuccess] = useState('')
 
   // Listen for custom auth errors from AppContext
-  import { useEffect } from 'react'
   useEffect(() => {
     const handleAuthError = (e) => {
       setError(e.detail)
