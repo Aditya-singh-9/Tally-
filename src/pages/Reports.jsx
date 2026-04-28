@@ -27,6 +27,8 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function Reports() {
   const { bills, purchases, products } = useApp()
   const [period, setPeriod] = useState('monthly')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
 
   const invoices = bills.filter(b => b.type === 'invoice' && b.status === 'completed')
   const completedPurchases = purchases.filter(b => b.status === 'completed')
@@ -73,7 +75,22 @@ export default function Reports() {
   // ── GST Computation (Tally Style) ──────────────────────────────
   const gstSummary = { sales: {}, purchases: {} }
 
-  invoices.forEach(b => {
+  // Filter for GST Computation
+  const filteredInvoices = invoices.filter(b => {
+    if (startDate && new Date(b.date) < new Date(startDate)) return false
+    if (endDate && new Date(b.date) > new Date(endDate)) return false
+    return true
+  })
+  const filteredPurchases = completedPurchases.filter(b => {
+    if (startDate && new Date(b.date) < new Date(startDate)) return false
+    if (endDate && new Date(b.date) > new Date(endDate)) return false
+    return true
+  })
+
+  const filteredOutputGst = filteredInvoices.reduce((s, b) => s + b.total_gst, 0)
+  const filteredInputGst = filteredPurchases.reduce((s, p) => s + p.total_gst, 0)
+
+  filteredInvoices.forEach(b => {
     b.items.forEach(it => {
       const rate = it.gst_rate || 18
       const taxable = it.amount || 0
@@ -84,7 +101,7 @@ export default function Reports() {
     })
   })
 
-  completedPurchases.forEach(b => {
+  filteredPurchases.forEach(b => {
     b.items.forEach(it => {
       const rate = it.gst_rate || 18
       const taxable = it.amount || 0
@@ -103,7 +120,7 @@ export default function Reports() {
 
   function exportGSTComputation() {
     const rows = [
-      ['GST Computation Summary (GSTR-3B Style)'],
+      [`GST Computation Summary (${startDate || 'All Time'} to ${endDate || 'All Time'})`],
       [],
       ['Outward Supplies (Sales)'],
       ['GST Rate', 'Taxable Value', 'Tax Amount (Output)']
@@ -112,7 +129,7 @@ export default function Reports() {
     salesRates.forEach(r => {
       rows.push([`${r}%`, gstSummary.sales[r].taxable.toFixed(2), gstSummary.sales[r].tax.toFixed(2)])
     })
-    rows.push(['Total Sales', totalSalesTaxable.toFixed(2), outputGst.toFixed(2)])
+    rows.push(['Total Sales', totalSalesTaxable.toFixed(2), filteredOutputGst.toFixed(2)])
     
     rows.push([])
     rows.push(['Inward Supplies (Purchases)'])
@@ -121,11 +138,11 @@ export default function Reports() {
     purchaseRates.forEach(r => {
       rows.push([`${r}%`, gstSummary.purchases[r].taxable.toFixed(2), gstSummary.purchases[r].tax.toFixed(2)])
     })
-    rows.push(['Total Purchases', totalPurchaseTaxable.toFixed(2), inputGst.toFixed(2)])
+    rows.push(['Total Purchases', totalPurchaseTaxable.toFixed(2), filteredInputGst.toFixed(2)])
     
     rows.push([])
     rows.push(['Net Liability'])
-    const net = outputGst - inputGst
+    const net = filteredOutputGst - filteredInputGst
     rows.push([net >= 0 ? 'GST Payable' : 'Excess ITC', '', Math.abs(net).toFixed(2)])
 
     downloadCSV(rows, 'GST_Computation.csv')
@@ -216,13 +233,30 @@ export default function Reports() {
         ))}
       </div>
 
-      <div className="card mb-6" style={{ background: 'var(--bg-card)', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: '4px solid ' + (outputGst > inputGst ? 'var(--yellow)' : 'var(--green)')}}>
+      <div className="card mb-6" style={{ background: 'var(--bg-card)', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: '4px solid ' + (filteredOutputGst > filteredInputGst ? 'var(--yellow)' : 'var(--green)')}}>
         <div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Net GST Liability</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Net GST Liability (Selected Period)</div>
           <div style={{ fontSize: 18, fontWeight: 700 }}>
-            {outputGst > inputGst ? 'Payment required: ' : 'Excess ITC: '} 
-            ₹{fmt(Math.abs(outputGst - inputGst))}
+            {filteredOutputGst > filteredInputGst ? 'Payment required: ' : 'Excess ITC: '} 
+            ₹{fmt(Math.abs(filteredOutputGst - filteredInputGst))}
           </div>
+        </div>
+        
+        {/* Date Filter */}
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>From</div>
+            <input type="date" className="form-input" style={{ width: 140, padding: '6px 12px', fontSize: 13 }} value={startDate} onChange={e => setStartDate(e.target.value)} />
+          </div>
+          <div>
+             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>To</div>
+            <input type="date" className="form-input" style={{ width: 140, padding: '6px 12px', fontSize: 13 }} value={endDate} onChange={e => setEndDate(e.target.value)} />
+          </div>
+          {(startDate || endDate) && (
+            <button className="btn btn-ghost" style={{ alignSelf: 'flex-end', padding: '6px 12px', color: 'var(--red)' }} onClick={() => { setStartDate(''); setEndDate('') }}>
+              Clear
+            </button>
+          )}
         </div>
       </div>
 
@@ -258,7 +292,7 @@ export default function Reports() {
                 <tr>
                   <td style={{ padding: '12px 20px', fontWeight: 700 }}>Total Output</td>
                   <td className="num" style={{ fontWeight: 700 }}>₹{fmt(totalSalesTaxable)}</td>
-                  <td className="num" style={{ paddingRight: 20, fontWeight: 700, color: 'var(--green)' }}>₹{fmt(outputGst)}</td>
+                  <td className="num" style={{ paddingRight: 20, fontWeight: 700, color: 'var(--green)' }}>₹{fmt(filteredOutputGst)}</td>
                 </tr>
               </tfoot>
             )}
@@ -295,7 +329,7 @@ export default function Reports() {
                 <tr>
                   <td style={{ padding: '12px 20px', fontWeight: 700 }}>Total ITC</td>
                   <td className="num" style={{ fontWeight: 700 }}>₹{fmt(totalPurchaseTaxable)}</td>
-                  <td className="num" style={{ paddingRight: 20, fontWeight: 700, color: 'var(--red)' }}>₹{fmt(inputGst)}</td>
+                  <td className="num" style={{ paddingRight: 20, fontWeight: 700, color: 'var(--red)' }}>₹{fmt(filteredInputGst)}</td>
                 </tr>
               </tfoot>
             )}
