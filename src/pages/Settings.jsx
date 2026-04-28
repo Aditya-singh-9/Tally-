@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext'
-import { Save, Building2 } from 'lucide-react'
+import { Save, Building2, Zap } from 'lucide-react'
 
 export default function Settings() {
   const { profile, updateProfile } = useApp()
@@ -16,6 +16,7 @@ export default function Settings() {
     ...profile 
   })
   const [saved, setSaved] = useState(false)
+  const [gstApiKey, setGstApiKey] = useState(localStorage.getItem('gst_api_key') || '')
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -112,6 +113,39 @@ export default function Settings() {
                 <div style={{ marginTop: 6 }}>GSTIN: <strong>{form.gstin || 'Not set'}</strong></div>
                 <div>Bank: {form.bank_name} · A/C: {form.bank_account} · IFSC: {form.ifsc_code}</div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* GST Auto-Fetch Settings */}
+        <div className="card" style={{ marginTop: 24 }}>
+          <div className="card-title flex items-center gap-2">
+            <Zap size={18} color="var(--accent)" /> GSTIN Auto-Fetch API Integration
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
+            Connect a 3rd-party GST verification API (like Razorpay or Masters India) to automatically pull Business Names and Addresses when you type a GSTIN.
+          </p>
+          <div className="form-group">
+            <label className="form-label">API Key (Saved securely on your device)</label>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <input 
+                type="password" 
+                className="form-input" 
+                value={gstApiKey} 
+                onChange={e => setGstApiKey(e.target.value)} 
+                placeholder="Paste your API key here..." 
+                style={{ flex: 1 }}
+              />
+              <button 
+                type="button"
+                className="btn btn-secondary" 
+                onClick={() => {
+                  localStorage.setItem('gst_api_key', gstApiKey)
+                  alert('API Key saved locally.')
+                }}
+              >
+                Save Key
+              </button>
             </div>
           </div>
         </div>

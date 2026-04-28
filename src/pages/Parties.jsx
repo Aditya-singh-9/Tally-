@@ -17,6 +17,41 @@ function PartyModal({ party, onClose, onSave }) {
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
+  const [fetchingGst, setFetchingGst] = useState(false)
+
+  async function fetchGSTDetails() {
+    if (!form.gstin || form.gstin.length !== 15) {
+      alert('Please enter a valid 15-digit GSTIN.')
+      return
+    }
+    const apiKey = localStorage.getItem('gst_api_key')
+    if (!apiKey) {
+      alert('Please add your GST API Key in the Settings page first to use auto-fetch.')
+      return
+    }
+    
+    setFetchingGst(true)
+    try {
+      // Mock/Common format (e.g., Masters India / RapidAPI)
+      const res = await fetch(`https://appyflow.in/api/verifyGST?gstNo=${form.gstin}&key_secret=${apiKey}`)
+      const data = await res.json()
+      
+      if (data.error || data.message) {
+        alert(data.error || data.message || 'Failed to fetch details. Invalid API Key or GSTIN.')
+      } else {
+        setForm(prev => ({
+          ...prev,
+          name: data.taxpayerInfo?.tradeName || data.taxpayerInfo?.legalName || prev.name,
+          address: data.taxpayerInfo?.pradr?.adr || prev.address
+        }))
+      }
+    } catch (err) {
+      alert('Network error while fetching GSTIN details. Make sure you have a valid API Key.')
+    } finally {
+      setFetchingGst(false)
+    }
+  }
+
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal">
@@ -38,8 +73,13 @@ function PartyModal({ party, onClose, onSave }) {
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label">GSTIN</label>
-              <input className="form-input" value={form.gstin} onChange={e => set('gstin', e.target.value)} />
+              <label className="form-label">GSTIN (Optional)</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input className="form-input" value={form.gstin} onChange={e => set('gstin', e.target.value.toUpperCase())} placeholder="27XXXXX1234X1Z5" maxLength={15} style={{ flex: 1 }} />
+                <button type="button" className="btn btn-secondary" onClick={fetchGSTDetails} disabled={fetchingGst || !form.gstin}>
+                  {fetchingGst ? '...' : 'Auto Fetch'}
+                </button>
+              </div>
             </div>
             <div className="form-group">
               <label className="form-label">Phone</label>
@@ -182,8 +222,9 @@ export default function Parties() {
   const [editParty, setEditParty] = useState(null)
   const [ledgerParty, setLedgerParty] = useState(null)
   const [filterType, setFilterType] = useState('all')
+  const [search, setSearch] = useState('')
 
-  const filtered = parties.filter(p => filterType === 'all' || p.type === filterType)
+  const filtered = parties.filter(p => (filterType === 'all' || p.type === filterType) && p.name.toLowerCase().includes(search.toLowerCase()))
 
   async function handleSave(data) {
     try {

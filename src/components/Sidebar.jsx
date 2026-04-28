@@ -1,7 +1,7 @@
 import { useApp } from '../context/AppContext'
 import {
   LayoutDashboard, Package, FileText, History,
-  BarChart2, Settings, LogOut, AlertTriangle, Users, Truck, Shield
+  BarChart2, Settings, LogOut, AlertTriangle, Users, Truck, Shield, Calculator
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { id: 'purchases', label: 'Purchases',    icon: Truck },
   { id: 'parties',   label: 'Parties',      icon: Users },
   { id: 'history',   label: 'Bill History', icon: History },
+  { id: 'gst',       label: 'GST Summary',  icon: Calculator },
   { id: 'reports',   label: 'Reports',      icon: BarChart2 },
 ]
 

@@ -12,6 +12,7 @@ import Settings from './pages/Settings'
 import Parties from './pages/Parties'
 import Purchases from './pages/Purchases'
 import AdminDashboard from './pages/AdminDashboard'
+import GSTReports from './pages/GSTReports'
 
 const PAGES = {
   dashboard: { component: Dashboard, title: 'Dashboard' },
@@ -21,7 +22,8 @@ const PAGES = {
   purchases:  { component: Purchases,  title: 'Purchase Voucher' },
   parties:    { component: Parties,    title: 'Parties & Ledgers' },
   history:    { component: BillHistory, title: 'Bill History' },
-  reports:    { component: Reports,    title: 'Reports & GST' },
+  gst:        { component: GSTReports, title: 'GST Summary' },
+  reports:    { component: Reports,    title: 'Reports & Analytics' },
   settings:   { component: Settings,   title: 'Settings' },
 }
 
