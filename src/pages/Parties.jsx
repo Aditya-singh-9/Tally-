@@ -25,28 +25,45 @@ function PartyModal({ party, onClose, onSave }) {
       return
     }
     const apiKey = localStorage.getItem('gst_api_key')
-    if (!apiKey) {
-      alert('Please add your GST API Key in the Settings page first to use auto-fetch.')
-      return
-    }
     
     setFetchingGst(true)
     try {
-      // Mock/Common format (e.g., Masters India / RapidAPI)
-      const res = await fetch(`https://appyflow.in/api/verifyGST?gstNo=${form.gstin}&key_secret=${apiKey}`)
-      const data = await res.json()
-      
-      if (data.error || data.message) {
-        alert(data.error || data.message || 'Failed to fetch details. Invalid API Key or GSTIN.')
+      if (apiKey) {
+        // Fast API Key method
+        const res = await fetch(`https://appyflow.in/api/verifyGST?gstNo=${form.gstin}&key_secret=${apiKey}`)
+        const data = await res.json()
+        
+        if (data.error || data.message) {
+          alert(data.error || data.message || 'Failed to fetch details. Invalid API Key or GSTIN.')
+        } else {
+          setForm(prev => ({
+            ...prev,
+            name: data.taxpayerInfo?.tradeName || data.taxpayerInfo?.legalName || prev.name,
+            address: data.taxpayerInfo?.pradr?.adr || prev.address
+          }))
+        }
       } else {
-        setForm(prev => ({
-          ...prev,
-          name: data.taxpayerInfo?.tradeName || data.taxpayerInfo?.legalName || prev.name,
-          address: data.taxpayerInfo?.pradr?.adr || prev.address
-        }))
+        // Fallback: Invisible Browser Scraper
+        if (!window.electronAPI || !window.electronAPI.scrapeGSTIN) {
+          alert('Invisible scraper is not available in this environment. Please run the desktop app.')
+          setFetchingGst(false)
+          return
+        }
+        
+        const data = await window.electronAPI.scrapeGSTIN(form.gstin)
+        
+        if (data.error) {
+          alert(data.error)
+        } else {
+          setForm(prev => ({
+            ...prev,
+            name: data.name || prev.name,
+            address: data.address || prev.address
+          }))
+        }
       }
     } catch (err) {
-      alert('Network error while fetching GSTIN details. Make sure you have a valid API Key.')
+      alert('Error fetching GSTIN details: ' + err.message)
     } finally {
       setFetchingGst(false)
     }

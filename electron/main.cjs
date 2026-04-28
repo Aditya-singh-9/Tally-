@@ -94,6 +94,69 @@ function createWindow() {
   Menu.setApplicationMenu(menu);
 }
 
+// Invisible Scraper Logic
+const { ipcMain } = require('electron');
+
+ipcMain.handle('scrape-gstin', async (event, gstin) => {
+  return new Promise((resolve) => {
+    const scraperWindow = new BrowserWindow({
+      show: false, // Invisible
+      webPreferences: { nodeIntegration: false }
+    });
+
+    // 15 sec timeout
+    let timeout = setTimeout(() => {
+      if (!scraperWindow.isDestroyed()) scraperWindow.destroy();
+      resolve({ error: 'Scraping timed out (15s).' });
+    }, 15000);
+
+    // Using a simple aggregate site (Quicko / ClearTax style search)
+    // We try to load a google search directly since it often shows the company name in the preview snippet
+    // This is much faster and doesn't rely on specific button clicks
+    scraperWindow.loadURL(`https://html.duckduckgo.com/html/?q=GSTIN+${gstin}`);
+
+    scraperWindow.webContents.on('did-finish-load', async () => {
+      try {
+        const result = await scraperWindow.webContents.executeJavaScript(`
+          new Promise((res) => {
+            setTimeout(() => {
+              const text = document.body.innerText;
+              
+              // Basic extraction logic looking for common patterns
+              const nameMatch = text.match(/(?:Legal Name|Trade Name|Business Name)[\\s:]+([A-Z0-9\\s\\.\\-]+)/i);
+              const addressMatch = text.match(/(?:Principal Place of Business|Address)[\\s:]+([^\\n]+)/i);
+              
+              if (nameMatch) {
+                res({
+                  name: nameMatch[1].trim(),
+                  address: addressMatch ? addressMatch[1].trim() : 'Address not found'
+                });
+              } else {
+                // Fallback: Just grab the first title result which is usually the business name
+                const firstResult = document.querySelector('.result__title');
+                if (firstResult && firstResult.innerText) {
+                  // Usually looks like "M/S SOME BUSINESS NAME - GSTIN Details..."
+                  let name = firstResult.innerText.split('-')[0].replace('GSTIN Details', '').trim();
+                  res({ name: name, address: 'Address not found on DuckDuckGo' });
+                } else {
+                  res({ error: 'Could not extract details automatically.' });
+                }
+              }
+            }, 1000); // give duckduckgo 1s to render text
+          });
+        `);
+        clearTimeout(timeout);
+        scraperWindow.destroy();
+        resolve(result);
+      } catch (err) {
+        clearTimeout(timeout);
+        scraperWindow.destroy();
+        resolve({ error: err.message });
+      }
+    });
+  });
+});
+
 app.whenReady().then(() => {
   createWindow();
   app.on('activate', () => {
