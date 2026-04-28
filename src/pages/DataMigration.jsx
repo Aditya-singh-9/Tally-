@@ -4,6 +4,7 @@ import { Upload, Database, CheckCircle, AlertTriangle, FileText, ArrowRight, X }
 import * as XLSX from 'xlsx'
 import JSZip from 'jszip'
 import { XMLParser } from 'fast-xml-parser'
+import { DBFReader } from 'dbf-reader'
 
 export default function DataMigration() {
   const { addParty, addProduct } = useApp()
@@ -47,6 +48,15 @@ export default function DataMigration() {
               logMsg(`Successfully parsed ${jsonData.length} rows from ZIP.`, 'success')
               foundData = true
               break
+            } else if (innerExt === 'dbf') {
+              logMsg(`Found DBF inside zip: ${relativePath}`)
+              const content = await zip.files[relativePath].async('arraybuffer')
+              const dbf = new DBFReader(content)
+              const rows = dbf.readRecords()
+              setDataPreview(rows)
+              logMsg(`Successfully parsed ${rows.length} records from DBF inside ZIP.`, 'success')
+              foundData = true
+              break
             } else if (innerExt === 'xml') {
               logMsg(`Found XML inside zip: ${relativePath}`)
               const content = await zip.files[relativePath].async('string')
@@ -61,6 +71,13 @@ export default function DataMigration() {
         logMsg('Parsing XML file...')
         const text = await uploaded.text()
         parseXMLData(text)
+      } else if (ext === 'dbf') {
+        logMsg('Parsing dBase (DBF) file...')
+        const buffer = await uploaded.arrayBuffer()
+        const dbf = new DBFReader(buffer)
+        const rows = dbf.readRecords()
+        setDataPreview(rows)
+        logMsg(`Successfully parsed ${rows.length} records from DBF file.`, 'success')
       } else {
         // Direct Excel / CSV
         logMsg(`Reading Excel/CSV file: ${uploaded.name}`)
@@ -217,7 +234,7 @@ export default function DataMigration() {
                 type="file" 
                 ref={fileInputRef} 
                 style={{ display: 'none' }} 
-                accept=".xlsx,.xls,.csv,.zip,.xml"
+                accept=".xlsx,.xls,.csv,.zip,.xml,.dbf"
                 onChange={handleFileUpload}
                 disabled={loading}
               />
@@ -233,7 +250,7 @@ export default function DataMigration() {
                 <div>
                   <Upload size={32} color="var(--text-muted)" style={{ margin: '0 auto 12px' }} />
                   <h4 style={{ fontWeight: 600, marginBottom: 4 }}>Click or Drag to Upload</h4>
-                  <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Supports .xlsx, .csv, and Tally .zip files</p>
+                  <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Supports .xlsx, .csv, .dbf, and Tally .zip files</p>
                 </div>
               )}
             </div>
